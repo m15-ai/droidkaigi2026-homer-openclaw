@@ -1,0 +1,39 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "/home/mjw/projects/baseball-openclaw/workspace",
+      "model": {
+        "primary": "openai/gpt-4.1"
+      },
+      "memorySearch": {
+        "enabled": false
+      },
+      "timeoutSeconds": 120
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "port": 19011,
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "generate-with: openssl rand -hex 24"
+    }
+  },
+  "tools": {
+    "profile": "coding",
+    "deny": [
+      "image_generate",
+      "web_fetch",
+      "web_search",
+      "browser"
+    ]
+  },
+  "plugins": {
+    "entries": {
+      "openai": {
+        "enabled": true
+      }
+    }
+  }
+}

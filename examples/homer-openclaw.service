@@ -1,0 +1,15 @@
+[Unit]
+Description=Homer-on-OpenClaw — baseball agent, OpenClaw brain (homer profile) over Pipecat WebRTC (:7865)
+After=network-online.target openclaw-homer-gateway.service
+Wants=network-online.target openclaw-homer-gateway.service
+
+[Service]
+WorkingDirectory=/home/mjw/projects/baseball-openclaw
+ExecStart=/home/mjw/projects/hermes-agent/venv/bin/python -u server.py
+Restart=on-failure
+RestartSec=5
+Environment=HOME=/home/mjw
+Environment=PATH=/home/mjw/.nvm/versions/node/v22.22.2/bin:/home/mjw/projects/hermes-agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

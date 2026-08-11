@@ -1,0 +1,20 @@
+[Unit]
+Description=OpenClaw Gateway — homer profile (baseball agent, :19011)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/home/mjw/.nvm/versions/node/v22.22.2/bin/node /home/mjw/.nvm/versions/node/v22.22.2/lib/node_modules/openclaw/dist/index.js --profile homer gateway --port 19011
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+SuccessExitStatus=0 143
+KillMode=control-group
+Environment=HOME=/home/mjw
+Environment=TMPDIR=/tmp
+Environment=NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+Environment=PATH=/home/mjw/.nvm/versions/node/v22.22.2/bin:/usr/local/bin:/usr/bin:/bin
+Environment=OPENAI_API_KEY=sk-...your-key...
+
+[Install]
+WantedBy=default.target

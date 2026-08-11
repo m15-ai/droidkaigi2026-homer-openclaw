@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "profiles": {
+    "openai:manual": {
+      "type": "api_key",
+      "provider": "openai",
+      "key": "sk-...your-key..."
+    }
+  }
+}
