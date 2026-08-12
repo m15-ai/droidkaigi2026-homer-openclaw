@@ -1,7 +1,8 @@
 # Homer-on-OpenClaw — baseball voice agent (:7865)
 
-The same Homer persona as [baseball-agent](../baseball-agent) (Nous
-hermes-agent, :7864), rebuilt on **OpenClaw** — a side-by-side comparison of
+The same Homer persona as
+[droidkaigi2026-homer-hermes](https://github.com/m15-ai/droidkaigi2026-homer-hermes)
+(Nous hermes-agent, :7864), rebuilt on **OpenClaw** — a side-by-side comparison of
 two agent frameworks behind the identical Pipecat WebRTC voice stack. Point
 the Android Pipecat client at `http://<server-ip>:7865` (`/api/offer`) to talk
 to this one.
