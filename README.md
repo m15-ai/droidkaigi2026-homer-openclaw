@@ -7,13 +7,8 @@ MLB questions from live data. Homer's favorite team is the Los Angeles Dodgers
 and his favorite player is Shohei Ohtani. Point the Android Pipecat client at
 `http://<server-ip>:7865` (`/api/offer`) and talk baseball.
 
-Part of the [DroidKaigi 2026 demo hub](https://github.com/m15-ai/droidkaigi2026)
-(start there for the talk materials and the other repos). A sibling repo,
-[droidkaigi2026-homer-hermes](https://github.com/m15-ai/droidkaigi2026-homer-hermes),
-implements the same Homer on a NousResearch hermes-agent brain (:7864) — same
-persona, same data tool, same voice — so the two can be compared behind an
-identical client contract. Each repo stands alone; you don't need one to run
-the other.
+> Part of the [DroidKaigi 2026 demo suite](https://github.com/m15-ai/droidkaigi2026) — see the
+> top-level repo for the session overview and the sibling demo apps.
 
 ## Architecture
 
@@ -39,16 +34,16 @@ server.py  :7865      [ Deepgram STT → OpenClawLLMService → Cartesia TTS ]
 | OpenClaw state | `~/.openclaw-homer/` | isolated `--profile homer` — leaves any default `~/.openclaw` install untouched |
 | Brain model | `openai/gpt-4.1` | `agents.defaults.model.primary` in `~/.openclaw-homer/openclaw.json`; key in `agents/main/agent/auth-profiles.json` |
 | Gateway | `openclaw-homer-gateway.service` (:19011, loopback) | `openclaw acp` is a gateway client — ACP dies with ECONNREFUSED without it |
-| Voice server | `homer-openclaw.service` (:7865) | hermes-agent venv (same as the other Pipecat surfaces) |
+| Voice server | `homer-openclaw.service` (:7865) | Homer agent venv |
 | Persona/tools | `workspace/*.md` | OpenClaw reads these natively — no identity boot needed (pre-warm ~2.5s) |
-| Voice | Cartesia "Austin" `1fcd23d0-…`, sonic-3 | same voice as hermes Homer |
+| Voice | Cartesia "Austin" `1fcd23d0-…`, sonic-3 | |
 | Tools denied | `web_fetch, web_search, browser, image_generate` | keeps turns fast and on-topic; mlb.py via exec is the only data path |
 
 ## Key files
 
 | # | File | What it is |
 |---|------|------------|
-| 1 | `server.py` | The Pipecat WebRTC server on :7865. Same audio rails as the hermes Homer — Deepgram STT → `OpenClawLLMService` → Cartesia TTS, Silero VAD for turn-taking/barge-in, a typing sound while the brain "thinks", the RTVI compat shim for the Android SDK. Pre-warms one shared ACP brain session at startup (~2.5s) so connects greet instantly. |
+| 1 | `server.py` | The Pipecat WebRTC server on :7865. Deepgram STT → `OpenClawLLMService` → Cartesia TTS, Silero VAD for turn-taking/barge-in, a typing sound while the brain "thinks", the RTVI compat shim for the Android SDK. Pre-warms one shared ACP brain session at startup (~2.5s) so connects greet instantly. |
 | 2 | `openclaw_llm.py` | The **bridge**. A Pipecat `LLMService` whose "model" is the OpenClaw agent: forwards each user turn (with a tiny `[voice]` tag) to the ACP subprocess, streams the reply, and chunks it into sentences so TTS starts speaking early. No Pipecat tools — OpenClaw owns its tools inside the brain. |
 | 3 | `botworker.py` | Process manager for the brain. Spawns one persistent `openclaw --profile homer acp` subprocess and talks JSON-RPC over stdio — many turns, one session. Transport-agnostic: nothing in it knows about WebRTC or audio. |
 | 4 | `config.py` | Brain wiring: which OpenClaw binary/profile/agent, the workspace cwd, timeouts. Everything overridable via env. |
@@ -93,7 +88,3 @@ journalctl --user -u homer-openclaw.service -f
 # brain alone (bypasses voice): see the ACP test snippets in git history
 ```
 
-Differences vs the hermes Homer worth noting: OpenClaw natively ingests the
-workspace docs (no SOUL.md injection machinery), tool use is agentic inside
-the brain (no iteration-budget tuning), and the same memory-write risks don't
-apply — the workspace docs are read-only unless you grant write tools.
