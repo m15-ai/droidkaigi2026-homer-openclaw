@@ -55,29 +55,158 @@ server.py  :7865      [ Deepgram STT → OpenClawLLMService → Cartesia TTS ]
 
 ## Setting it up fresh
 
-### API keys (three of them)
+Tested on a Raspberry Pi 5 (Debian 12, aarch64) with Python 3.11 and Node 22;
+any Linux box should do.
 
-| Key | What for | Where it goes | Get one at |
-|---|---|---|---|
-| OpenAI | the brain model (`openai/gpt-4.1`) | `~/.openclaw-homer/agents/main/agent/auth-profiles.json` (template: [`examples/auth-profiles.json`](examples/auth-profiles.json)) and the gateway unit's `Environment=OPENAI_API_KEY=` line | platform.openai.com |
-| Deepgram | speech-to-text | `.env` (copy [`.env.example`](.env.example)) | console.deepgram.com |
-| Cartesia | text-to-speech | `.env` (same file) | play.cartesia.ai |
+### What you need
+
+| Thing | Why | Where |
+|---|---|---|
+| Node.js **22.12+** | runs OpenClaw (the `openclaw` CLI refuses older Nodes) | `nvm install 22` |
+| Python 3.11 | the Pipecat voice server's venv | your package manager |
+| OpenAI API key | the brain model (`openai/gpt-4.1`) | platform.openai.com |
+| Deepgram API key | speech-to-text | console.deepgram.com |
+| Cartesia API key | text-to-speech | play.cartesia.ai |
+| The Android Pipecat client | the phone side | the DroidKaigi 2026 demo suite (point it at this box) |
+
+The MLB data itself needs **no key** — `statsapi.mlb.com` is free.
+
+### 1. Get this repo
 
 ```bash
-cp .env.example .env    # then edit: Deepgram + Cartesia keys
+git clone <this-repo> ~/projects/baseball-openclaw
+cd ~/projects/baseball-openclaw
+```
+
+The persona docs in `workspace/TOOLS.md` reference the clone by absolute path
+(the brain runs `mlb.py` via its exec tool, so relative paths can't be trusted
+across cwds). Point them at *your* clone:
+
+```bash
+grep -rl '/home/mjw/projects/baseball-openclaw' workspace/ \
+  | xargs sed -i "s|/home/mjw/projects/baseball-openclaw|$PWD|g"
+```
+
+### 2. Install OpenClaw
+
+```bash
+npm i -g openclaw
+openclaw --version       # reference: 2026.4.14
+```
+
+If the version check complains `Node.js v22.12+ is required`, your default
+`node` is too old — `nvm install 22 && nvm alias default 22`.
+
+### 3. Create Homer's profile (`~/.openclaw-homer`)
+
+OpenClaw keeps a profile's whole state — config, agent auth, sessions — under
+one directory, selected by `--profile homer`. Keeping Homer in his own profile
+leaves any default `~/.openclaw` install untouched. This repo carries
+sanitized templates in [`examples/`](examples):
+
+```bash
+mkdir -p ~/.openclaw-homer/agents/main/agent
+cp examples/openclaw.json ~/.openclaw-homer/openclaw.json
+cp examples/auth-profiles.json ~/.openclaw-homer/agents/main/agent/auth-profiles.json
+```
+
+Then three edits:
+
+1. `~/.openclaw-homer/openclaw.json` — set `agents.defaults.workspace` to this
+   clone's `workspace/` directory (absolute path), and replace the gateway
+   `auth.token` placeholder (`openssl rand -hex 24`).
+2. `~/.openclaw-homer/agents/main/agent/auth-profiles.json` — your OpenAI key.
+3. Nothing else. The persona and tool docs (`IDENTITY.md`, `AGENTS.md`,
+   `TOOLS.md`, `USER.md`) are read natively from `workspace/` at session
+   start — there is no prompt-injection machinery to configure.
+
+### 4. Start the gateway
+
+`openclaw acp` (what the voice server spawns) is a gateway *client* — without
+a running gateway it dies with `ECONNREFUSED`. Install the unit template and
+start it:
+
+```bash
+cp examples/openclaw-homer-gateway.service ~/.config/systemd/user/
+# edit it: your node/openclaw paths + your OPENAI_API_KEY on the Environment= line
+systemctl --user daemon-reload
+systemctl --user enable --now openclaw-homer-gateway.service
+systemctl --user status openclaw-homer-gateway.service   # active (running), :19011 loopback
+```
+
+(While experimenting you can skip systemd and just run
+`openclaw --profile homer gateway --port 19011` in a spare terminal.)
+
+### 5. Install the voice server (Pipecat)
+
+Its own venv, so the audio stack's pins never fight anything else on the box:
+
+```bash
+python3.11 -m venv venv
+venv/bin/pip install "pipecat-ai[deepgram,cartesia,silero,webrtc]==1.3.0" \
+  fastapi uvicorn loguru python-dotenv
+```
+
+Reference versions this was built against: `pipecat-ai 1.3.0`,
+`deepgram-sdk 7.3.0`, `aiortc 1.14.0`, `fastapi 0.136.3`, `uvicorn 0.48.0`.
+
+Configure the voice keys:
+
+```bash
+cp .env.example .env    # then edit: Deepgram + Cartesia keys (voice id ships as "Austin")
 chmod 600 .env
 ```
 
-The MLB data needs **no key** — `statsapi.mlb.com` is free.
+The brain's OpenAI key does **not** go in `.env` — it lives in the OpenClaw
+profile and the gateway unit (step 3/4). If your OpenClaw binary or clone path
+differ from the defaults in [`config.py`](config.py), override via env
+(`OPENCLAW_BIN`, `OPENCLAW_CWD`, … — every value there is env-overridable).
 
-### Everything else
+### 6. Run it
 
-Sanitized templates for the host-specific bits are in [`examples/`](examples):
-`openclaw.json` + `auth-profiles.json` go under `~/.openclaw-homer/` (the
-latter at `agents/main/agent/`), and the two systemd units go in
-`~/.config/systemd/user/`. Install OpenClaw itself with `npm i -g openclaw`
-(Node 22+), fix the absolute `/home/mjw/...` paths to match your box, and
-start the gateway before the voice server.
+```bash
+venv/bin/python -u server.py
+```
+
+You should see `Homer-OpenClaw server up on 0.0.0.0:7865 — POST /api/offer to
+connect.` and, a couple of seconds later, `OpenClaw brain pre-warmed in 2.5s`.
+Check from another terminal:
+
+```bash
+curl http://localhost:7865/health          # -> {"status":"ok"}
+python3 skills/mlb/mlb.py dodgers          # the data tool, standalone
+```
+
+Then point the Android Pipecat client at `http://<server-ip>:7865` (signaling
+endpoint `/api/offer`) and say hello.
+
+### 7. Run it as a service (optional)
+
+```bash
+cp examples/homer-openclaw.service ~/.config/systemd/user/
+# edit it: WorkingDirectory + the venv python path for your box
+systemctl --user daemon-reload
+systemctl --user enable --now homer-openclaw.service
+loginctl enable-linger $USER    # keep it running after logout
+```
+
+### Troubleshooting
+
+- **`ECONNREFUSED` at startup / `brain pre-warm failed`** — the gateway isn't
+  running (step 4); the ACP subprocess is a gateway client, not a standalone
+  brain.
+- **`Node.js v22.12+ is required`** — the `openclaw` shim resolves `node` from
+  `PATH`; make Node 22 the default (`nvm alias default 22`) or use absolute
+  node paths as the example gateway unit does.
+- **Homer invents stats or won't run the tool** — the `mlb.py` cheat-sheet
+  paths in `workspace/TOOLS.md` must point at your clone (step 1).
+- **Turns are slow or wander off-topic** — check the tool denies in
+  `~/.openclaw-homer/openclaw.json`: `web_fetch`, `web_search`, `browser`, and
+  `image_generate` should stay denied so `mlb.py` via exec is the only data
+  path.
+- **No audio / connect fails from the phone** — client and server must share a
+  network (or VPN); check `curl http://<server-ip>:7865/health` from the
+  phone's network, and that nothing else owns port 7865.
 
 ## Ops
 

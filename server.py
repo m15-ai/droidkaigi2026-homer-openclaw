@@ -97,14 +97,21 @@ _GREET_SEED = ("Greet the user as Homer in ONE short, friendly sentence and "
                "no team or player name-drops, no examples, no second sentence.")
 
 
+# brain_label lives outside this repo (shared across the demo box's voice
+# surfaces for the little status LCD). Fresh installs won't have it — the
+# display state is a no-op anywhere but the demo box, so degrade to a plain
+# label instead of failing the import.
 import sys as _sys
-_sys.path.insert(0, "/home/mjw/projects/lib")
-import brain_label as _brain_label_mod   # shared across all four voice surfaces
-
+_sys.path.insert(0, os.getenv("HOMER_SHARED_LIB", "/home/mjw/projects/lib"))
+try:
+    import brain_label as _brain_label_mod   # shared across all four voice surfaces
+    _BRAIN = _brain_label_mod.from_openclaw(
+        path=str(_Path.home() / ".openclaw-homer" / "openclaw.json"))
+except ImportError:
+    _BRAIN = "LLM"
 
 _IDENTITY = {"name": "Homer", "transport": "Pipecat", "agent": "OpenClaw",
-             "brain": _brain_label_mod.from_openclaw(
-                 path=str(_Path.home() / ".openclaw-homer" / "openclaw.json")),
+             "brain": _BRAIN,
              "tools": ["mlb"]}
 
 
