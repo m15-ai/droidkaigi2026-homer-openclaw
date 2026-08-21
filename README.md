@@ -53,6 +53,24 @@ server.py  :7865      [ Deepgram STT → OpenClawLLMService → Cartesia TTS ]
 | 8 | `examples/` | Sanitized templates for the host-specific bits: `openclaw.json` (profile config), `auth-profiles.json` (LLM key), and both systemd units. |
 | 9 | `assets/` | The typing sound played during the thinking gap. |
 
+## The typing sound
+
+An agent brain has a much longer time-to-first-token than a bare LLM: a turn
+that runs `mlb.py` inside the brain can take several seconds before the first
+word comes back, and that much dead air on a phone call reads as "it's broken."
+So a quiet keyboard-typing loop plays under the gap — the caller hears Homer
+"working on it" instead of silence.
+
+How it's wired: [`assets/keyboard-typing-24k.ogg`](assets) is attached to the
+transport's output as a Pipecat `SoundfileMixer` (`audio_out_mixer`, looped,
+volume 0.45, starts muted). OpenClaw's tool use happens *inside* the ACP
+brain — the pipeline never sees Pipecat function-call frames it could hook —
+so a small `ThinkingSound` frame processor in `server.py` fills the gap
+directly: it unmutes the mixer when the LLM turn starts
+(`LLMFullResponseStartFrame`) and mutes it again on the first streamed text
+chunk (`LLMTextFrame`), right before TTS starts speaking. Fast turns barely
+tick; a long tool-running turn types until the answer lands.
+
 ## Setting it up fresh
 
 Tested on a Raspberry Pi 5 (Debian 12, aarch64) with Python 3.11 and Node 22;
